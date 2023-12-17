@@ -4,9 +4,14 @@ import io from 'socket.io-client'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
-const socket = io(process.env.BACKEND_URL, { // || 'http://localhost:8000'
+/*const socket = io(process.env.BACKEND_URL, { // || 'http://localhost:8000'
   withCredentials: true
+})*/
+
+const socket = io(process.env.WEB_PUBSUB_URL, {
+  path: "/clients/socketio/hubs/Hub"
 })
+
 console.log("Backend URL: ", process.env.BACKEND_URL)
 const App = () => {
 
