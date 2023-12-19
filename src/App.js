@@ -1,18 +1,26 @@
 import './normal.css'
 import React, { useState, useEffect } from 'react'
-import io from 'socket.io-client'
+//import io from 'socket.io-client'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { Client } from '@azure/web-pubsub'
 
 /*const socket = io(process.env.BACKEND_URL, { // || 'http://localhost:8000'
   withCredentials: true
-})*/
+})
+console.log("Backend URL: ", process.env.BACKEND_URL)*/
 
-const socket = io(process.env.WEB_PUBSUB_URL, {
-  path: "/clients/socketio/hubs/Hub"
+
+
+
+const client = new Client({
+  connectionString: process.env.AZURE_WEBPUBSUB_CONNECTION_STRING,
 })
 
-console.log("Backend URL: ", process.env.BACKEND_URL)
+const subscription = client.subscribe('chatUpdates')
+
+
+
 const App = () => {
 
   const [ value, setValue ] = useState(null)
@@ -72,49 +80,9 @@ const App = () => {
     const storedChatIDs = sessionStorage.getItem('chatIDs')
     return storedChatIDs ? JSON.parse(storedChatIDs) : []
   }
-
-
   
 
-  /*
-  const getMessages = async () => {
-    //let chatLogNew = [...previousChats, { role: "user", content: `${value}`} ]
-    setChatLog([...chatLog, { "role": "user", "content": `${value}` }])
-    setValue("")
 
-  }*/
-  
-
-  /*const getMessages = async (chatHistory) => {
-
-    // save each chat in an array and send that array to the server depending on the current title
-
-    //const questions = currentChat.map(message => message.message).join("\n")
-
-
-    //try to figure out how to send the title as well and separate each chat
-    const options = {
-      method: "POST",
-      body: JSON.stringify({
-        message: chatHistory
-      }),
-      headers: {
-        "Content-Type": "application/json"
-      }
-    }
-
-    try {
-      const response = await fetch('http://localhost:8000/completions', options)
-      const data = await response.json()
-      //console.log(data.message)
-      //setMessage(data.message) //data.choices?.[0].messages
-      return data.message
-
-    } catch (error) {
-      console.error(error)
-      return null
-    }
-  }*/
 
   
 
@@ -176,7 +144,11 @@ const App = () => {
       setValue('')
 
 
-      socket.emit('userInput', updatedChatBeforeAPI)
+      //socket.emit('userInput', updatedChatBeforeAPI)
+      client.send({
+        channel: 'chatUpdates',
+        message: JSON.stringify(updatedChatBeforeAPI)
+      })
 
       
       setPreviousChats((prevChats) => ({
@@ -245,7 +217,7 @@ const App = () => {
 
   
 
-  useEffect(() => {
+  /*useEffect(() => {
     socket.on('serverUpdate', (data) => {
       //console.log('Received data from server:', data)
       if (data !== "[DONE]" && data) {
@@ -267,88 +239,27 @@ const App = () => {
       socket.off('serverUpdate')
       socket.off('serverError')
     }
+  }, [])*/
+
+  useEffect(() => {
+    
+
+    subscription.on('message', (data) => {
+      if (data !== "[DONE]" && data) {
+        setAnswer((prevAnswer) => prevAnswer + data)
+      } else {
+        setMessage((prevMessage) => prevMessage + answer)
+        setLoading(false)
+      }
+    })
+
+    return () => {
+      // Clean up event listeners when the component unmounts
+      subscription.off('message')
+    }
   }, [])
 
   
-
-
-
-  /*const handleSubmitButtonClick = async () => {
-
-
-
-    if (value) {
-      // Concatenate user input to current chat
-      
-      const newChatID = currentChatID || `Chat${Object.keys(previousChats).length + 1}`
-      if (!currentChatID) {
-        setChatList((prevChatList) => [...prevChatList, newChatID])
-      }
-
-      setCurrentChatID(newChatID)
-      
-      
-      
-      setPreviousChats((prevChats) => ({
-        ...prevChats,
-        [newChatID]: [
-          ...(prevChats[newChatID] || []),
-          {
-            role: 'user',
-            content: value,
-          },
-        ],
-      }))
-
-
-      
-      
-      const currentChatArray = previousChats[newChatID] || []
-      const updatedChatBeforeAPI = [
-        ...currentChatArray,
-        {
-          role: 'user',
-          content: value,
-        },
-      ]
-
-      //console.log(updatedChatBeforeAPI)
-
-      //setCurrentChat(updatedChatBeforeAPI)
-      setValue('')
-
-      // Make API call with the entire chat history
-      const apiResponse = await getMessages(updatedChatBeforeAPI)
-
-      if (apiResponse) {
-        setMessage(apiResponse.content)
-        setPreviousChats((prevChats) => ({
-          ...prevChats,
-          [newChatID]: [
-            ...(prevChats[newChatID] || []),
-            {
-              role: apiResponse.role,
-              content: apiResponse.content,
-            },
-          ],
-        }))
-
-        //const updatedChatArray = previousChats[newChatID]
-        //setCurrentChat(updatedChatArray)
-
-        
-      }
-    }
-  }*/
-
-  //const isDivDisabled = value.trim() === ''
-
-  /*useEffect(() => {
-    const newUniqueTitles = Array.from(new Set(previousChats.map(previousChat => previousChat.title)))
-    setUniqueTitles(newUniqueTitles)
-    console.log(previousChats)
-    console.log(newUniqueTitles)
-  }, [message])*/
 
   useEffect(() => {
     if (!value) {
@@ -408,63 +319,6 @@ const App = () => {
     }
   }, []) // Empty dependency array, runs on mount and unmount
 
-
-  
-
-  //const newUniqueTitles = Array.from(new Set(previousChats.map(previousChat => previousChat.title)))
-  //setUniqueTitles(newUniqueTitles)
-  //console.log(uniqueTitles)
-  
-
-  //console.log(currentChat.map(message => message.message).join("\n"))
-  //console.log(value)
-
-  /*
-  {isSidebarOpen && (
-                <button className="close-sidebar" onClick={toggleSidebar}><span><svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="1em"
-                height="1em"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                className="icon-toggle"
-                viewBox="0 0 24 24"
-              >
-                <rect width={18} height={18} x={3} y={3} rx={2} ry={2} />
-                <path d="M9 3v18" />
-              </svg></span></button>
-              )}
-              */
-
-              
-
-              /* {isSidebarOpen && (
-            <button className="close-sidebar" onClick={toggleSidebar}>
-              <span>
-                <svg xmlns="http://www.w3.org/2000/svg" width={12} height={40} viewBox='100 50 600 600' className="svg-arrow">
-                  <path
-                    fill="#62626d"
-                    d="M685.248 919.296a64 64 0 0 0 0-90.496L368.448 512l316.8-316.8a64 64 0 0 0-90.496-90.496L232.704 466.752a64 64 0 0 0 0 90.496l362.048 362.048a64 64 0 0 0 90.496 0z"
-                  />
-                </svg>
-              </span>
-            </button>
-          )}
-        {!isSidebarOpen && (
-            <button className="open-sb" onClick={toggleSidebar}>
-              <span>
-                <svg xmlns="http://www.w3.org/2000/svg" width={12} height={40} viewBox='150 150 650 600' className="svg-arrow rotate180">
-                  <path
-                    fill="#62626d"
-                    d="M338.752 104.704a64 64 0 0 0 0 90.496l316.8 316.8-316.8 316.8a64 64 0 0 0 90.496 90.496l362.048-362.048a64 64 0 0 0 0-90.496L429.248 104.704a64 64 0 0 0-90.496 0z"
-                  />
-                </svg>
-              </span>
-            </button>
-          )}*/
   
 
   return (
@@ -707,65 +561,6 @@ const AssistantMessage = ({ receivedMessage }) => {
 }
 
 
-
-/*const AssistantMessage = ({ receivedMessage }) => {
-  const [ codeSnippets, setCodeSnippets ] = useState([])
-
-  useEffect(() => {
-    const snippets = receivedMessage.split('```').filter((_, index) => index % 2 !== 0)
-    setCodeSnippets(snippets)
-  }, [receivedMessage])
-
-  return (
-    <div>
-      {codeSnippets.map((snippet, index) => (
-        <React.Fragment key={index}>
-          <div
-            className="content-wrapper"
-            style={{ maxWidth: '596px', wordWrap: 'break-word', marginBottom: '10px' }}
-          >
-            {index % 2 === 0 && (
-              <div className="content">
-                {receivedMessage.split('```')[0].split(/\s+/).map((word, wordIndex) => (
-                  <span key={wordIndex} style={{ marginRight: '5px' }}>{word}</span>
-                ))}
-              </div>
-            )}
-            <div className="max-w-2xl min-w-W bg-C rounded-md overflow-hidden">
-              <div className="flex justify-between px-4 text-white text-xs items-center height-CB">
-                <p className="text-sm"></p>
-                <button key={index} className="py-1 inline-flex items-center gap-1">
-                  <span className="text-base mt-1">
-                    <ion-icon name='clipboard-outline'></ion-icon>
-                  </span>
-                  Copy code
-                </button>
-                
-              </div>
-              <SyntaxHighlighter key={index} language="auto" style={vscDarkPlus} customStyle={{
-                  padding: "25px",
-                  backgroundColor:"black",
-                  margin: "0 0",
-                }}
-                wrapLongLines={true}
-                >
-                {snippet}
-              </SyntaxHighlighter>
-            </div>
-            {codeSnippets.length > 1 && index % 2 === 0 && (
-              <div className="content">
-                {receivedMessage.split('```').slice(-1)[0].split(/\s+/).map((word, wordIndex) => (
-                  <span key={wordIndex} style={{ marginRight: '5px' }}>{word}</span>
-                ))}
-              </div>
-            )}
-          </div>
-        </React.Fragment>
-      ))}
-    </div>
-  )
-}*/
-
 const CodeMessage = ({ chatMessage }) => {
   const [ copy, setCopy ] = useState({})
 
@@ -834,7 +629,7 @@ const CodeMessage = ({ chatMessage }) => {
   return <div>{renderContent()}</div>
 }
 
-// call above IconMain using: <ChatFeed currentChat={currentChat} isSidebarOpen={isSidebarOpen} />
+
 const ChatFeed = ({ currentChat, isSidebarOpen, answer }) => {
   return (
     <ul className="feed">
@@ -891,7 +686,6 @@ const ChatFeed = ({ currentChat, isSidebarOpen, answer }) => {
                 <p className="content">{chatMessage.content}</p>
               )}
               {chatMessage.role === 'assistant' && chatMessage.content === '' && (
-                //<p className="content">{answer}</p>
                 <AssistantMessage receivedMessage={answer} />
               )}
               <CodeMessage key={index} chatMessage={chatMessage} />
@@ -904,87 +698,8 @@ const ChatFeed = ({ currentChat, isSidebarOpen, answer }) => {
   )
 }
 
-// <TestStream answer={answer} />
-/*const TestStream = ({ answer }) => {
-  return (
-    <div>{answer && <p>{answer}</p>}</div>
-  )
-}*/
-
-/*{chatMessage.role === 'assistant' && chatMessage.content !== '' && (
-                <p className="content">{chatMessage.content}</p>
-              )}*/
 
 
 
 export default App
 
-
-/*{code !== "" && chatMessage.role === 'assistant' && chatMessage.content !== '' && (
-                <SyntaxHighlighter language="javascript" style={docco}>
-                  {code}
-                </SyntaxHighlighter>
-              )}*/
-
-
-/*
-<ul className="feed">
-          {currentChat?.map((chatMessage, index) => <li key={index} className={
-            chatMessage.role === "user"
-            ? "user-item"
-            : chatMessage.role === "assistant"
-            ? "assistant-item"
-            : ""
-          }>
-            <p className="role">
-              {chatMessage.role === "user" ? (
-                <div className="user-icon">
-                  <svg
-                xmlns="http://www.w3.org/2000/svg"
-                height="1em"
-                style={{
-                  fill: 'white',
-                }}
-                viewBox="0 0 448 512"
-              >
-                <path d="M224 256a128 128 0 1 0 0-256 128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3 0 498.7 13.3 512 29.7 512h388.6c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3h-91.4z" />
-              </svg>
-                </div>
-              ) : chatMessage.role === "assistant" ? (
-                <div className="assistant-icon">
-                  <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  fill="none"
-                  className="icon-md"
-                  viewBox="0 0 40 40"
-                >
-                  <text x={-9999} y={-9999}>
-                    {"ChatGPT"}
-                  </text>
-                  <path
-                    fill="currentColor"
-                    d="M37.532 16.87a9.963 9.963 0 0 0-.856-8.184 10.078 10.078 0 0 0-10.855-4.835A9.964 9.964 0 0 0 18.306.5a10.079 10.079 0 0 0-9.614 6.977 9.967 9.967 0 0 0-6.664 4.834 10.08 10.08 0 0 0 1.24 11.817 9.965 9.965 0 0 0 .856 8.185 10.079 10.079 0 0 0 10.855 4.835 9.965 9.965 0 0 0 7.516 3.35 10.078 10.078 0 0 0 9.617-6.981 9.967 9.967 0 0 0 6.663-4.834 10.079 10.079 0 0 0-1.243-11.813ZM22.498 37.886a7.474 7.474 0 0 1-4.799-1.735c.061-.033.168-.091.237-.134l7.964-4.6a1.294 1.294 0 0 0 .655-1.134V19.054l3.366 1.944a.12.12 0 0 1 .066.092v9.299a7.505 7.505 0 0 1-7.49 7.496ZM6.392 31.006a7.471 7.471 0 0 1-.894-5.023c.06.036.162.099.237.141l7.964 4.6a1.297 1.297 0 0 0 1.308 0l9.724-5.614v3.888a.12.12 0 0 1-.048.103l-8.051 4.649a7.504 7.504 0 0 1-10.24-2.744ZM4.297 13.62A7.469 7.469 0 0 1 8.2 10.333c0 .068-.004.19-.004.274v9.201a1.294 1.294 0 0 0 .654 1.132l9.723 5.614-3.366 1.944a.12.12 0 0 1-.114.01L7.04 23.856a7.504 7.504 0 0 1-2.743-10.237Zm27.658 6.437-9.724-5.615 3.367-1.943a.121.121 0 0 1 .113-.01l8.052 4.648a7.498 7.498 0 0 1-1.158 13.528v-9.476a1.293 1.293 0 0 0-.65-1.132Zm3.35-5.043c-.059-.037-.162-.099-.236-.141l-7.965-4.6a1.298 1.298 0 0 0-1.308 0l-9.723 5.614v-3.888a.12.12 0 0 1 .048-.103l8.05-4.645a7.497 7.497 0 0 1 11.135 7.763Zm-21.063 6.929-3.367-1.944a.12.12 0 0 1-.065-.092v-9.299a7.497 7.497 0 0 1 12.293-5.756 6.94 6.94 0 0 0-.236.134l-7.965 4.6a1.294 1.294 0 0 0-.654 1.132l-.006 11.225Zm1.829-3.943 4.33-2.501 4.332 2.5v5l-4.331 2.5-4.331-2.5V18Z"
-                  />
-                </svg>
-                </div>
-              ) : null}
-            </p>
-            <p className="content">{chatMessage.content}</p>
-          </li>)}
-        </ul>
-        */
-
-/*
-        {loading && (
-          <div id="cancel" onClick={cancelAPI}><span><svg
-          xmlns="http://www.w3.org/2000/svg"
-          width={16}
-          height={16}
-          fill="currentColor"
-          className=""
-          >
-          <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2z" />
-          </svg></span></div>
-        )}*/
